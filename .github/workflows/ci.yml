@@ -48,9 +48,10 @@ jobs:
       - name: openFrameworks libraries
         run: |
           if [ "${{ matrix.name }}" = "linux64" ]; then
-            "$OF/scripts/linux/download_libs.sh" -a 64
+            # the same package openFrameworks' own Linux CI uses
+            "$OF/scripts/linux/download_libs.sh" -t latest -a 64gcc6
           else
-            "$OF/scripts/osx/download_libs.sh"
+            "$OF/scripts/osx/download_libs.sh" -t latest
           fi
 
       - name: Build the examples
