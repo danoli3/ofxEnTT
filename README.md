@@ -2,6 +2,9 @@
 
 ![ofxEnTT](ofxaddons_thumbnail.png)
 
+![example_instancing: 51,146 spinning cubes drawn in one instanced draw call](docs/example_instancing.jpg)
+*`example_instancing`: 51,146 entities, one instanced draw call, with the ofxGui inspector.*
+
 [EnTT](https://github.com/skypjack/entt) for openFrameworks: a fast entity component system, with
 a world that runs its systems every frame, a transform hierarchy, instanced rendering, JSON save /
 load, and bridges to `ofParameter`, ofxGui, ofxImGui and ofxAssimpModelLoader.
