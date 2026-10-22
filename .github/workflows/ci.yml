@@ -1,0 +1,81 @@
+name: ofxEnTT
+
+on:
+  push:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Builds every example against openFrameworks master and runs example_tests.
+# The graphical examples are only built: CI runners have no GPU to run them on.
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux64, os: ubuntu-24.04, template: linux }
+          - { name: macos, os: macos-15, template: osx }
+    env:
+      OF: ${{ github.workspace }}/of
+    steps:
+      - name: openFrameworks master
+        run: git clone --depth 1 https://github.com/openframeworks/openFrameworks "$OF"
+
+      # straight into of/addons so the examples' ../../.. reaches the OF root
+      - uses: actions/checkout@v6
+        with:
+          path: of/addons/ofxEnTT
+
+      - name: ofxImGui (develop) for example_imgui
+        run: git clone --depth 1 -b develop https://github.com/jvcleave/ofxImGui "$OF/addons/ofxImGui"
+
+      - name: Dependencies (linux64)
+        if: matrix.name == 'linux64'
+        run: sudo "$OF/scripts/linux/ubuntu/install_dependencies.sh" -y
+
+      - name: openFrameworks libraries
+        run: |
+          if [ "${{ matrix.name }}" = "linux64" ]; then
+            "$OF/scripts/linux/download_libs.sh" -a 64
+          else
+            "$OF/scripts/osx/download_libs.sh"
+          fi
+
+      - name: Build the examples
+        run: |
+          JOBS=$(getconf _NPROCESSORS_ONLN)
+          cd "$OF/addons/ofxEnTT"
+          for example in example_tests example_instancing example_hierarchy example_assimp example_imgui; do
+            echo "::group::$example"
+            cp "$OF/scripts/templates/${{ matrix.template }}/Makefile" "$OF/scripts/templates/${{ matrix.template }}/config.make" "$example/"
+            config=Release
+            [ "$example" = "example_tests" ] && config=Debug
+            if ! make -C "$example" -j"$JOBS" "$config"; then
+              echo "::error title=Build failed::$example ($config)"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done
+        env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+      - name: Run the unit tests
+        run: |
+          cd "$OF/addons/ofxEnTT/example_tests"
+          if [ "${{ matrix.name }}" = "macos" ]; then
+            bin/example_tests_debug.app/Contents/MacOS/example_tests_debug
+          else
+            cd bin && ./example_tests_debug
+          fi

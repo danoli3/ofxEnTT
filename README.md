@@ -1,5 +1,7 @@
 # ofxEnTT
 
+[![ofxEnTT](https://github.com/danoli3/ofxEnTT/actions/workflows/ci.yml/badge.svg)](https://github.com/danoli3/ofxEnTT/actions/workflows/ci.yml)
+
 ![ofxEnTT](ofxaddons_thumbnail.png)
 
 ![example_instancing: 51,146 spinning cubes drawn in one instanced draw call](docs/example_instancing.jpg)
