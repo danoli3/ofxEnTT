@@ -18,6 +18,7 @@ class ofApp : public ofxUnitTestsApp {
 		testWorldTransforms();
 		testSystems();
 		testBatches();
+		testVisibility();
 		testClone();
 		testJson();
 		testParameters();
@@ -153,6 +154,39 @@ class ofApp : public ofxUnitTestsApp {
 		ofxTestEq(boxes, size_t(10), "box batch skips Hidden");
 		ofxTestEq(spheres, size_t(3), "sphere batch");
 		ofxTestEq(materials, size_t(1), "material in its own batch");
+	}
+
+	void testVisibility() {
+		World world;
+		auto mesh = std::make_shared<ofVboMesh>(ofMesh::box(1, 1, 1));
+		auto many = world.create(size_t(4));
+		ofxTestEq(many.size(), size_t(4), "create(count)");
+		ofxTestEq(world.size(), size_t(4), "size after create(count)");
+		for (auto e : many) {
+			world.registry.emplace<MeshRenderer>(e, mesh);
+		}
+		world.update(0.f);
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(4), "all visible");
+
+		world.setVisible(many[0], false);
+		world.setHidden(many[1], true);
+		world.update(0.f);
+		ofxTest(!world.isVisible(many[0]), "MeshRenderer.visible false");
+		ofxTest(world.isHidden(many[1]) && !world.isVisible(many[1]), "Hidden tag");
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(2), "visible skips Hidden and visible=false");
+
+		world.setVisible(many[0], true);
+		world.setHidden(many[1], false);
+		world.update(0.f);
+		ofxTest(world.isVisible(many[0]) && world.isVisible(many[1]), "shown again");
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(4), "all visible after show");
+
+		auto quad = makeQuad(6);
+		auto disk = makeDisk(4, 8);
+		auto box = makeBox(2, 2, 2);
+		ofxTest(quad && quad->getNumVertices() > 0, "makeQuad");
+		ofxTest(disk && disk->getNumVertices() > 0, "makeDisk");
+		ofxTest(box && box->getNumVertices() > 0, "makeBox");
 	}
 
 	void testClone() {

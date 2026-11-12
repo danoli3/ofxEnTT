@@ -82,6 +82,9 @@ struct MeshRenderer {
 	/// Per-entity colour, also the per-instance colour when instanced.
 	ofFloatColor color { 1.f, 1.f, 1.f, 1.f };
 	ofPolyRenderMode mode { OF_MESH_FILL };
+	/// False skips the entity in collectBatches without adding/removing Hidden.
+	/// Flip this every frame for large instance pools (Actor trails, voxel grids).
+	bool visible = true;
 };
 
 /// Tag: the RenderSystem skips the entity.

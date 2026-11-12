@@ -47,6 +47,9 @@ ofJson toJson(const World & world) {
 		}
 		if (auto * c = registry.try_get<MeshRenderer>(entity)) {
 			e["color"] = { c->color.r, c->color.g, c->color.b, c->color.a };
+			if (!c->visible) {
+				e["visible"] = false;
+			}
 		}
 		list.push_back(e);
 	}
@@ -93,10 +96,16 @@ std::vector<Entity> fromJson(World & world, const ofJson & json, bool clear) {
 		if (e.value("hidden", false)) {
 			registry.emplace_or_replace<Hidden>(entity);
 		}
-		if (e.contains("color")) {
-			const auto & c = e.at("color");
-			registry.get_or_emplace<MeshRenderer>(entity).color
-				= ofFloatColor(c.at(0).get<float>(), c.at(1).get<float>(), c.at(2).get<float>(), c.at(3).get<float>());
+		if (e.contains("color") || e.contains("visible")) {
+			auto & renderer = registry.get_or_emplace<MeshRenderer>(entity);
+			if (e.contains("color")) {
+				const auto & c = e.at("color");
+				renderer.color
+					= ofFloatColor(c.at(0).get<float>(), c.at(1).get<float>(), c.at(2).get<float>(), c.at(3).get<float>());
+			}
+			if (e.contains("visible")) {
+				renderer.visible = e.at("visible").get<bool>();
+			}
 		}
 	}
 	return created;

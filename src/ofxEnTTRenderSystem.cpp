@@ -97,7 +97,7 @@ std::vector<RenderSystem::Batch> RenderSystem::collectBatches(Registry & registr
 	std::vector<Batch> batches;
 	std::unordered_map<BatchKey, size_t, BatchKeyHash> index;
 	for (auto [entity, renderer, world] : registry.view<MeshRenderer, WorldTransform>(entt::exclude<Hidden>).each()) {
-		if (!renderer.mesh || renderer.mesh->getNumVertices() == 0) {
+		if (!renderer.visible || !renderer.mesh || renderer.mesh->getNumVertices() == 0) {
 			continue;
 		}
 		BatchKey key { renderer.mesh.get(), renderer.texture.get(), renderer.material.get(), static_cast<int>(renderer.mode) };
