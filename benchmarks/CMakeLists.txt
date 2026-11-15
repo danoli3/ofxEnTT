@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22)
+project(ofxentt_benchmarks LANGUAGES C CXX)
+set(OF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." CACHE PATH "openFrameworks root")
+include("${OF_ROOT}/libs/openFrameworksCompiled/project/CMake/openFrameworks.cmake")
+of_add_app(ofxentt_benchmarks ADDONS ofxEnTT)

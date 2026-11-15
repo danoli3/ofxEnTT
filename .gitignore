@@ -19,3 +19,5 @@ example*/icon.rc
 example*/.vscode/
 build/
 .DS_Store
+benchmarks/build/
+benchmarks/bin/

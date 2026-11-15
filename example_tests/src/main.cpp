@@ -16,6 +16,7 @@ class ofApp : public ofxUnitTestsApp {
 		testCreateDestroy();
 		testHierarchy();
 		testWorldTransforms();
+		testDirectTransforms();
 		testSystems();
 		testBatches();
 		testVisibility();
@@ -94,6 +95,23 @@ class ofApp : public ofxUnitTestsApp {
 		Transform t;
 		t.setOrientationEulerDeg(euler);
 		ofxTest(near(t.getOrientationEulerDeg(), euler, 1e-3f), "Euler round trip");
+	}
+
+	void testDirectTransforms() {
+		bool matches = true;
+		for (int i = 0; i < 128; ++i) {
+			Transform t;
+			t.position = { float(i - 64), 2.5f, -3.f };
+			t.orientation = glm::quat(glm::vec3(i * .031f, i * -.017f, i * .009f));
+			t.scale = { i % 2 ? -2.f : 0.f, .5f, 3.f };
+			auto reference = glm::translate(glm::mat4(1.f), t.position)
+				* glm::mat4_cast(t.orientation) * glm::scale(glm::mat4(1.f), t.scale);
+			auto matrix = t.localMatrix();
+			for (int c = 0; c < 4; ++c) {
+				matches &= glm::all(glm::lessThanEqual(glm::abs(matrix[c] - reference[c]), glm::vec4(1e-4f)));
+			}
+		}
+		ofxTest(matches, "direct TRS matches matrix products, including zero and negative scales");
 	}
 
 	void testSystems() {
