@@ -17,6 +17,7 @@ class ofApp : public ofxUnitTestsApp {
 		testHierarchy();
 		testWorldTransforms();
 		testDirectTransforms();
+		testIncrementalTransforms();
 		testSystems();
 		testVelocityGroup();
 		testBatches();
@@ -114,6 +115,54 @@ class ofApp : public ofxUnitTestsApp {
 			}
 		}
 		ofxTest(matches, "direct TRS matches matrix products, including zero and negative scales");
+	}
+
+	void testIncrementalTransforms() {
+		World world;
+		auto root = world.create(), child = world.create(), leaf = world.create(), other = world.create();
+		world.setParent(child, root);
+		world.setParent(leaf, child);
+		world.transforms.setIncremental(true);
+		world.update(0.f);
+		ofxTestEq(world.transforms.getStats().updated, size_t(4), "incremental first update computes everything");
+		world.update(0.f);
+		ofxTest(world.transforms.getStats().updated == 0 && world.transforms.getStats().skipped == 4, "unchanged transforms skip matrix writes");
+		world.registry.get<Transform>(root).position = { 2, 0, 0 };
+		world.update(0.f);
+		ofxTest(world.transforms.getStats().updated == 3
+			&& near(world.registry.get<WorldTransform>(leaf).getPosition(), { 2, 0, 0 }), "direct field edits propagate through descendants");
+		world.registry.get<Transform>(child).scale = { -2, 3, 0 };
+		world.registry.get<Transform>(leaf).position = { 1, 1, 1 };
+		world.update(0.f);
+		ofxTest(world.transforms.getStats().updated == 2
+			&& near(world.registry.get<WorldTransform>(leaf).getPosition(), { 0, 3, 0 }), "incremental scale edits update descendants");
+		world.setParent(child, other);
+		world.update(0.f);
+		ofxTest(near(world.registry.get<WorldTransform>(leaf).getPosition(), { -2, 3, 0 }), "incremental reparent refreshes world transforms");
+		world.registry.remove<WorldTransform>(child);
+		world.update(0.f);
+		ofxTest(world.registry.all_of<WorldTransform>(child) && world.transforms.getStats().updated == 2, "removed world matrices are regenerated");
+		world.transforms.markDirty(root);
+		world.update(0.f);
+		ofxTestEq(world.transforms.getStats().updated, size_t(1), "explicit dirty mark forces a refresh");
+		world.transforms.invalidate();
+		world.update(0.f);
+		ofxTestEq(world.transforms.getStats().updated, size_t(4), "invalidation refreshes all cached matrices");
+		world.destroy(child);
+		world.update(0.f);
+		auto replacement = world.create();
+		world.registry.get<Transform>(replacement).position = { 8, 0, 0 };
+		world.update(0.f);
+		ofxTest(near(world.registry.get<WorldTransform>(replacement).getPosition(), { 8, 0, 0 }), "entity reuse does not reuse stale transform state");
+		world.transforms.setIncremental(false);
+		world.update(0.f);
+		ofxTestEq(world.transforms.getStats().updated, world.size(), "disabling the cache restores full updates");
+		Registry separate;
+		auto e = separate.create();
+		separate.emplace<Transform>(e).position = { 9, 0, 0 };
+		world.transforms.setIncremental(true);
+		world.transforms.update(separate);
+		ofxTest(near(separate.get<WorldTransform>(e).getPosition(), { 9, 0, 0 }), "cache handles a different registry");
 	}
 
 	void testSystems() {

@@ -48,3 +48,13 @@ creation/reordering cost is excluded. 20k cases use 20 frames per sample and 200
 cases use 5. All positions and orientations are compared by entity after timing.
 The inline checksum adds the same per-entity arithmetic to both paths. This
 measures motion only, excluding world-transform propagation, rendering, and setup.
+
+## Incremental transforms
+
+20k roots or chains of eight, with 0%, 1%, or 100% of local positions edited each
+frame. The comparison is full updates versus the opt-in snapshot cache, both with
+the optimized TRS construction and retained root scratch buffer. Edits, hierarchy
+visits, cache comparisons/pruning, and checksums are timed. Warmup builds the cache;
+its first-frame allocation/setup and extra memory are excluded from timing. Every
+world matrix is checked against full updates after timing. Descendants of edited
+parents also update, so 1% edited local transforms need not mean 1% world updates.

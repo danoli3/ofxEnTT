@@ -67,6 +67,26 @@ void transformsBenchmark() {
 			[&] { after.transforms.update(after.registry); return checksum(after.registry); });
 	}
 }
+void incrementalBenchmark() {
+	for (bool hierarchy : { false, true }) for (int percent : { 0, 1, 100 }) {
+		World before, after;
+		populate(before, 20000, hierarchy); populate(after, 20000, hierarchy);
+		after.transforms.setIncremental(true);
+		auto oldEntities = before.getEntities(), newEntities = after.getEntities();
+		auto frame = [percent](World & world, const std::vector<Entity> & entities) {
+			for (size_t i = 0; i < entities.size() * percent / 100; ++i)
+				world.registry.get<Transform>(entities[i]).position.x += .001f;
+			world.transforms.update(world.registry);
+			return checksum(world.registry);
+		};
+		char label[96];
+		std::snprintf(label, sizeof(label), "incremental / %s / %d%% edits", hierarchy ? "chains" : "roots", percent);
+		bench::compare(label, [&] { return frame(before, oldEntities); }, [&] { return frame(after, newEntities); });
+		for (auto e : oldEntities) bench::require(near(before.registry.get<WorldTransform>(e).matrix,
+			after.registry.get<WorldTransform>(e).matrix), "incremental/full matrix mismatch");
+	}
+}
+
 }
 
 int main() {
@@ -74,6 +94,7 @@ int main() {
 		transformsBenchmark();
 		bench::renderBenchmark();
 		bench::groupsBenchmark();
+		incrementalBenchmark();
 	} catch (const std::exception & error) {
 		std::fprintf(stderr, "%s\n", error.what());
 		return 1;
