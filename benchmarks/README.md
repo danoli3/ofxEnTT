@@ -58,3 +58,17 @@ visits, cache comparisons/pruning, and checksums are timed. Warmup builds the ca
 its first-frame allocation/setup and extra memory are excluded from timing. Every
 world matrix is checked against full updates after timing. Descendants of edited
 parents also update, so 1% edited local transforms need not mean 1% world updates.
+
+## SIMD-friendly bulk linear motion
+
+Kernel-only comparisons use an array of `{glm::vec3 position, velocity}` versus
+`LinearMotionBatch`, with 20k, 200k and 2M particles. Both perform the same three
+linear updates; positions on all axes are verified afterward (absolute tolerance
+1e-4). A first/last position checksum is timed, not a full serial reduction that
+could obscure vectorized kernel time. 20k cases use 20 frames/sample; larger cases
+use 5. Setup/reserve/conversion costs are excluded.
+
+Separate 20k/200k comparisons include both bulk integration and its serial scatter
+to ECS Transforms, versus built-in view-based motion with zero angular velocities.
+All local positions are checked by entity. Both exclude world-matrix propagation
+and drawing. No kernel-only result should be read as an end-to-end ECS speedup.

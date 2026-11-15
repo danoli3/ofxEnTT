@@ -113,6 +113,27 @@ frame. It adds per-entity memory/comparison work and can lose on frequently movi
 scenes. Only recomputed matrices emit `WorldTransform` update notifications in this
 mode. Inspect `world.transforms.getStats()` for updated/skipped matrix counts.
 
+For large independent linear-particle pools, `LinearMotionBatch` keeps six
+contiguous float arrays so the compiler can vectorize across entities:
+
+```cpp
+ofxEnTT::LinearMotionBatch particles;
+particles.reserve(20000);
+particles.add(position, velocity, entity); // entity binding is optional
+particles.update(dt);
+particles.syncTo(world); // optional serial copy to bound entities' local positions
+world.update(dt);
+```
+
+The batch owns its positions/velocities. Do not also attach a built-in `Velocity`
+to a bound entity unless two integration steps are intended. Rotation, hierarchy,
+lifetime, and world matrices remain the world's responsibility. Deleted entity
+versions are skipped during sync. Removing an item swaps the last item into its
+index; `clear()` retains capacity. Span accessors expose the six fixed-size arrays
+without permitting mismatched vector lengths. Copying results into ECS components
+has a cost; kernel-only SIMD gains do not imply a faster whole frame. No global
+GLM alignment changes, NEON-only code, or architecture flags are required.
+
 Reproducible before/after CPU measurements live in [benchmarks](benchmarks/README.md).
 
 ## JSON
