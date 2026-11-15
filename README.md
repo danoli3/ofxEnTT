@@ -120,7 +120,8 @@ For the 200k rotating scene, explicitly enabling the owning group and four total
 threads reduced this CPU stage to **10.876 ms (55.5% less than the old baseline)**.
 Optional paths are workload-dependent: parallel scheduling, transform snapshots,
 and copying bulk particle data back to ECS can cost more than they save. All 46
-comparisons matched exactly in this run across 132,760,000 checked float values.
+comparisons recorded zero numerical difference across 132,760,000 checked float
+values; signed-zero bit patterns can differ.
 
 **Run the examples:** [per-feature benchmarks](benchmarks/README.md) and the
 [full before/after comparison](benchmarks/revisions/README.md). The

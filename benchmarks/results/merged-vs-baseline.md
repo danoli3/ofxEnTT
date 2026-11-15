@@ -47,7 +47,8 @@ workers. These are CPU-stage timings, not GPU or FPS results.
 20k, 10 at 200k, or 5 at 2M. Separate persistent executables are measured in
 shuffled serial order (seed 20261115); idle configurations wait for input.
 Validation and setup are outside the timed region. The 46 comparisons checked
-132,760,000 float values and observed zero difference in this run.
+132,760,000 float values and observed zero numerical difference in this run;
+positive and negative zero can have different bit patterns.
 
 - [Raw primary results](merged-vs-baseline.json).
 - [31-sample bulk follow-up](merged-vs-baseline-bulk-followup.json).

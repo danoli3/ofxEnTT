@@ -86,7 +86,8 @@ machine metadata, an actual compiler command, source hashes, and validation coun
 After timing, every final local/world transform, packed matrix/color, or bulk
 position is compared in canonical order. The validator permits an error of
 `1e-4 * max(1, abs(reference))` and rejects non-finite values. The recorded M1 Max
-run happened to match bit-for-bit across all 46 comparisons.
+run had zero numerical difference across all 46 comparisons. This is a numeric
+comparison, not a byte comparison: positive and negative zero compare equal.
 
 Scene creation, process/thread startup, first allocations and validation are
 excluded from timing. GPU uploads, draw calls, and FPS are not measured. Run on an
