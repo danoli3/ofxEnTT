@@ -4,8 +4,6 @@
 #include "ofGLUtils.h"
 #include "ofLog.h"
 
-#include <tuple>
-#include <unordered_map>
 
 namespace ofxEnTT {
 
@@ -74,45 +72,12 @@ void main() {
 }
 )";
 
-struct BatchKey {
-	const void * mesh;
-	const void * texture;
-	const void * material;
-	int mode;
-	bool operator==(const BatchKey & o) const {
-		return std::tie(mesh, texture, material, mode) == std::tie(o.mesh, o.texture, o.material, o.mode);
-	}
-};
-
-struct BatchKeyHash {
-	size_t operator()(const BatchKey & k) const {
-		auto h = std::hash<const void *>();
-		return h(k.mesh) ^ (h(k.texture) << 1) ^ (h(k.material) << 2) ^ (std::hash<int>()(k.mode) << 3);
-	}
-};
-
 } // namespace
 
 std::vector<RenderSystem::Batch> RenderSystem::collectBatches(Registry & registry) {
 	std::vector<Batch> batches;
-	std::unordered_map<BatchKey, size_t, BatchKeyHash> index;
-	for (auto [entity, renderer, world] : registry.view<MeshRenderer, WorldTransform>(entt::exclude<Hidden>).each()) {
-		if (!renderer.visible || !renderer.mesh || renderer.mesh->getNumVertices() == 0) {
-			continue;
-		}
-		BatchKey key { renderer.mesh.get(), renderer.texture.get(), renderer.material.get(), static_cast<int>(renderer.mode) };
-		auto found = index.find(key);
-		if (found == index.end()) {
-			found = index.emplace(key, batches.size()).first;
-			Batch batch;
-			batch.mesh = renderer.mesh.get();
-			batch.texture = renderer.texture.get();
-			batch.material = renderer.material.get();
-			batch.mode = renderer.mode;
-			batches.push_back(std::move(batch));
-		}
-		batches[found->second].entities.push_back(entity);
-	}
+	detail::BatchIndex index;
+	detail::collectBatches(registry, batches, index);
 	return batches;
 }
 
@@ -138,31 +103,35 @@ bool RenderSystem::isInstancingSupported() {
 
 void RenderSystem::draw(Registry & registry) {
 	stats = {};
-	for (const auto & batch : collectBatches(registry)) {
+	// These pointers never outlive this draw: the registry can change next frame.
+	auto count = detail::collectBatches(registry, drawBatches, batchIndex);
+	for (size_t i = 0; i < count; ++i) {
+		auto & batch = drawBatches[i];
 		bool instanced = instancing && !batch.material
-			&& batch.entities.size() >= std::max<size_t>(minInstances, 1)
+			&& batch.items.size() >= std::max<size_t>(minInstances, 1)
 			&& isInstancingSupported();
 		if (instanced) {
-			drawInstanced(registry, batch);
+			drawInstanced(batch);
 		} else {
-			drawEach(registry, batch);
+			drawEach(batch);
 		}
+		batch.items.clear();
 	}
 }
 
-void RenderSystem::drawInstanced(Registry & registry, const Batch & batch) {
-	const auto count = batch.entities.size();
+void RenderSystem::drawInstanced(const DrawBatch & batch) {
+	const auto count = batch.items.size();
 	for (auto & column : columns) {
 		column.resize(count);
 	}
 	colors.resize(count);
 	for (size_t i = 0; i < count; i++) {
-		auto entity = batch.entities[i];
-		const auto & matrix = registry.get<WorldTransform>(entity).matrix;
+		const auto & item = batch.items[i];
+		const auto & matrix = item.world->matrix;
 		for (int c = 0; c < 4; c++) {
 			columns[c][i] = matrix[c];
 		}
-		const auto & color = registry.get<MeshRenderer>(entity).color;
+		const auto & color = item.renderer->color;
 		colors[i] = { color.r, color.g, color.b, color.a };
 	}
 
@@ -192,12 +161,12 @@ void RenderSystem::drawInstanced(Registry & registry, const Batch & batch) {
 	stats.instancedBatches++;
 }
 
-void RenderSystem::drawEach(Registry & registry, const Batch & batch) {
-	for (auto entity : batch.entities) {
-		const auto & renderer = registry.get<MeshRenderer>(entity);
+void RenderSystem::drawEach(const DrawBatch & batch) {
+	for (const auto & item : batch.items) {
+		const auto & renderer = *item.renderer;
 		ofPushStyle();
 		ofPushMatrix();
-		ofMultMatrix(registry.get<WorldTransform>(entity).matrix);
+		ofMultMatrix(item.world->matrix);
 		ofSetColor(renderer.color);
 		if (batch.material) batch.material->begin();
 		if (batch.texture) batch.texture->bind();

@@ -102,6 +102,7 @@ private:
 		System system;
 	};
 	std::vector<NamedSystem> systems;
+	std::vector<Entity> expired;
 	ofEventListener updateListener;
 	ofEventListener drawListener;
 

@@ -19,6 +19,7 @@ class ofApp : public ofxUnitTestsApp {
 		testDirectTransforms();
 		testSystems();
 		testBatches();
+		testBatchReuse();
 		testVisibility();
 		testClone();
 		testJson();
@@ -172,6 +173,27 @@ class ofApp : public ofxUnitTestsApp {
 		ofxTestEq(boxes, size_t(10), "box batch skips Hidden");
 		ofxTestEq(spheres, size_t(3), "sphere batch");
 		ofxTestEq(materials, size_t(1), "material in its own batch");
+	}
+
+	void testBatchReuse() {
+		World world;
+		auto mesh = std::make_shared<ofVboMesh>(ofMesh::box(1, 1, 1));
+		auto a = world.create(), b = world.create();
+		world.registry.emplace<MeshRenderer>(a, mesh);
+		world.registry.emplace<MeshRenderer>(b, mesh);
+		world.update(0.f);
+		std::vector<detail::DrawBatch> batches;
+		detail::BatchIndex index;
+		ofxTestEq(detail::collectBatches(world.registry, batches, index), size_t(1), "reusable batch initial scene");
+		world.clear();
+		ofxTestEq(detail::collectBatches(world.registry, batches, index), size_t(0), "reusable batches skip stale slots after clear");
+		auto c = world.create();
+		world.registry.emplace<MeshRenderer>(c, mesh);
+		world.update(0.f);
+		auto count = detail::collectBatches(world.registry, batches, index);
+		ofxTest(count == 1 && batches[0].items.size() == 1
+			&& batches[0].items[0].renderer == &world.registry.get<MeshRenderer>(c)
+			&& batches[0].items[0].world == &world.registry.get<WorldTransform>(c), "reused batches refresh component pointers");
 	}
 
 	void testVisibility() {
