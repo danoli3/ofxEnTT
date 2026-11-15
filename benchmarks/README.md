@@ -1,6 +1,17 @@
 # CPU benchmarks
 
-Build inside an openFrameworks tree:
+Two runnable examples are included:
+
+- **Per-feature:** the C++ executable below compares individual algorithms and
+  optional paths in one optimized binary.
+- **Whole revision:** [the revision launcher](revisions/README.md) builds the
+  original and merged addon sources into separate executables and compares full
+  CPU frames, updates, renderer preparation, and bulk particle kernels. This is
+  the source of the [README results](results/merged-vs-baseline.md).
+
+## Build and run the per-feature example
+
+From the addon root, inside an openFrameworks tree with CMake support:
 
 ```sh
 cmake -S benchmarks -B benchmarks/build -DCMAKE_BUILD_TYPE=Release
@@ -9,12 +20,31 @@ benchmarks/bin/ofxentt_benchmarks.app/Contents/MacOS/ofxentt_benchmarks # macOS
 # benchmarks/bin/ofxentt_benchmarks                               # Linux
 ```
 
+Add `-DOF_ROOT=/path/to/openFrameworks` when configuring if needed. The addon must
+be installed as `ofxEnTT` in that tree's `addons` directory. Requires CMake 3.22+
+and the usual openFrameworks dependencies. Run a Release build for timings.
+
+For make-based openFrameworks installations, `benchmarks/addons.make` is included:
+copy the platform's `Makefile` and `config.make` templates into `benchmarks/`, then
+run `make -C benchmarks Release`. On macOS the executable is
+`benchmarks/bin/benchmarks.app/Contents/MacOS/benchmarks`; on Linux it is
+`benchmarks/bin/benchmarks`. This runs the same `src/main.cpp` benchmark.
+
+If a custom prebuilt core already bundles FreeImage, the CMake examples accept
+`-DOFXENTT_CORE_BUNDLES_FREEIMAGE=ON` to avoid linking it twice. This is off by
+default and was needed only for the local installed core used for the recorded
+measurements. Normal builds should leave it off.
+
 The executable compares frozen reference implementations with the new paths in
 the same optimized binary. Results are medians of 11 alternating samples, each
 containing 20 frames, after three warmup frames. Checksums consume the outputs.
 Scene generation uses seed 42; correctness is checked before timing. Times cover
 CPU work only, including checksums and the allocations made by each path. No GL
 context or GPU drawing is included. Negative percentages mean less elapsed time.
+
+Individual sections below describe exceptions to the default sample size. These
+per-feature measurements use a different method from the separate-revision
+comparison; do not add their percentages or compare the absolute times directly.
 
 ## Direct transforms
 

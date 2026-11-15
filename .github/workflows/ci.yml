@@ -37,6 +37,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           path: of/addons/ofxEnTT
+          fetch-depth: 0 # the revision benchmark needs the historical baseline
 
       - name: ofxImGui (develop) for example_imgui
         run: git clone --depth 1 -b develop https://github.com/jvcleave/ofxImGui "$OF/addons/ofxImGui"
@@ -58,7 +59,7 @@ jobs:
         run: |
           JOBS=$(getconf _NPROCESSORS_ONLN)
           cd "$OF/addons/ofxEnTT"
-          for example in example_tests example_instancing example_hierarchy example_assimp example_imgui; do
+          for example in example_tests example_instancing example_hierarchy example_assimp example_imgui benchmarks; do
             echo "::group::$example"
             cp "$OF/scripts/templates/${{ matrix.template }}/Makefile" "$OF/scripts/templates/${{ matrix.template }}/config.make" "$example/"
             config=Release
@@ -80,3 +81,19 @@ jobs:
           else
             cd bin && ./example_tests_debug
           fi
+
+      - name: Run the per-feature benchmarks
+        run: |
+          cd "$OF/addons/ofxEnTT/benchmarks"
+          if [ "${{ matrix.name }}" = "macos" ]; then
+            bin/benchmarks.app/Contents/MacOS/benchmarks
+          else
+            bin/benchmarks
+          fi
+
+      - name: Check the original-versus-merged benchmark example
+        run: |
+          cd "$OF/addons/ofxEnTT"
+          python3 benchmarks/revisions/run.py --of-root "$OF" \
+            --build-dir "$RUNNER_TEMP/ofxentt-revision-bench" \
+            --filter pipeline --samples 3 --jobs 2
