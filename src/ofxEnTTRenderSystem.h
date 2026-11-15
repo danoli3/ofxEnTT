@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofxEnTTComponents.h"
+#include "detail/ofxEnTTBatching.h"
 
 namespace ofxEnTT {
 
@@ -39,6 +40,8 @@ public:
 	/// Simple lighting in the built-in instanced shader (needs mesh normals).
 	bool lighting = true;
 
+	/// Component pointers are cached for this call only. Do not remove or reorder
+	/// rendered components from callbacks during drawing.
 	void draw(Registry & registry);
 
 	/// The batches draw() would use, in a stable order. No GL needed.
@@ -50,6 +53,10 @@ public:
 	const Stats & getStats() const { return stats; }
 
 private:
+	using DrawBatch = detail::DrawBatch;
+	std::vector<DrawBatch> drawBatches;
+	detail::BatchIndex batchIndex;
+
 	ofShader shader;
 	bool shaderTried = false;
 	bool shaderReady = false;
@@ -57,8 +64,8 @@ private:
 	std::vector<glm::vec4> columns[4];
 	std::vector<glm::vec4> colors;
 
-	void drawInstanced(Registry & registry, const Batch & batch);
-	void drawEach(Registry & registry, const Batch & batch);
+	void drawInstanced(const DrawBatch & batch);
+	void drawEach(const DrawBatch & batch);
 };
 
 } // namespace ofxEnTT

@@ -245,16 +245,16 @@ bool World::hasSystem(const std::string & name) const {
 }
 
 void World::updateVelocity(float dt) {
-	for (auto [entity, transform, velocity] : registry.view<Transform, Velocity>().each()) {
+	registry.view<Transform, const Velocity>().each([dt](Transform & transform, const Velocity & velocity) {
 		transform.position += velocity.linear * dt;
 		if (glm::length(velocity.angular) > 0.f) {
 			transform.orientation = glm::normalize(glm::quat(velocity.angular * dt) * transform.orientation);
 		}
-	}
+	});
 }
 
 void World::updateLifetime(float dt) {
-	std::vector<Entity> expired;
+	expired.clear();
 	for (auto [entity, lifetime] : registry.view<Lifetime>().each()) {
 		lifetime.remaining -= dt;
 		if (lifetime.remaining <= 0.f) {

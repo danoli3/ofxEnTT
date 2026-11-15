@@ -11,6 +11,7 @@ public:
 	void update(Registry & registry);
 
 private:
+	std::vector<Entity> roots;
 	void visit(Registry & registry, Entity entity, const glm::mat4 * parentMatrix);
 };
 

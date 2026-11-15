@@ -1,5 +1,6 @@
 #include "ofxEnTT.h"
 #include "Benchmark.h"
+#include "RenderBench.h"
 #include <random>
 
 using namespace ofxEnTT;
@@ -70,6 +71,7 @@ void transformsBenchmark() {
 int main() {
 	try {
 		transformsBenchmark();
+		bench::renderBenchmark();
 	} catch (const std::exception & error) {
 		std::fprintf(stderr, "%s\n", error.what());
 		return 1;
