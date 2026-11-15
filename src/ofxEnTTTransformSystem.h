@@ -11,7 +11,7 @@ public:
 	void update(Registry & registry);
 
 private:
-	void visit(Registry & registry, Entity entity, const glm::mat4 & parentMatrix);
+	void visit(Registry & registry, Entity entity, const glm::mat4 * parentMatrix);
 };
 
 } // namespace ofxEnTT

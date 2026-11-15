@@ -16,8 +16,10 @@ class ofApp : public ofxUnitTestsApp {
 		testCreateDestroy();
 		testHierarchy();
 		testWorldTransforms();
+		testDirectTransforms();
 		testSystems();
 		testBatches();
+		testVisibility();
 		testClone();
 		testJson();
 		testParameters();
@@ -95,6 +97,23 @@ class ofApp : public ofxUnitTestsApp {
 		ofxTest(near(t.getOrientationEulerDeg(), euler, 1e-3f), "Euler round trip");
 	}
 
+	void testDirectTransforms() {
+		bool matches = true;
+		for (int i = 0; i < 128; ++i) {
+			Transform t;
+			t.position = { float(i - 64), 2.5f, -3.f };
+			t.orientation = glm::quat(glm::vec3(i * .031f, i * -.017f, i * .009f));
+			t.scale = { i % 2 ? -2.f : 0.f, .5f, 3.f };
+			auto reference = glm::translate(glm::mat4(1.f), t.position)
+				* glm::mat4_cast(t.orientation) * glm::scale(glm::mat4(1.f), t.scale);
+			auto matrix = t.localMatrix();
+			for (int c = 0; c < 4; ++c) {
+				matches &= glm::all(glm::lessThanEqual(glm::abs(matrix[c] - reference[c]), glm::vec4(1e-4f)));
+			}
+		}
+		ofxTest(matches, "direct TRS matches matrix products, including zero and negative scales");
+	}
+
 	void testSystems() {
 		World world;
 		auto mover = world.create("mover");
@@ -153,6 +172,39 @@ class ofApp : public ofxUnitTestsApp {
 		ofxTestEq(boxes, size_t(10), "box batch skips Hidden");
 		ofxTestEq(spheres, size_t(3), "sphere batch");
 		ofxTestEq(materials, size_t(1), "material in its own batch");
+	}
+
+	void testVisibility() {
+		World world;
+		auto mesh = std::make_shared<ofVboMesh>(ofMesh::box(1, 1, 1));
+		auto many = world.create(size_t(4));
+		ofxTestEq(many.size(), size_t(4), "create(count)");
+		ofxTestEq(world.size(), size_t(4), "size after create(count)");
+		for (auto e : many) {
+			world.registry.emplace<MeshRenderer>(e, mesh);
+		}
+		world.update(0.f);
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(4), "all visible");
+
+		world.setVisible(many[0], false);
+		world.setHidden(many[1], true);
+		world.update(0.f);
+		ofxTest(!world.isVisible(many[0]), "MeshRenderer.visible false");
+		ofxTest(world.isHidden(many[1]) && !world.isVisible(many[1]), "Hidden tag");
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(2), "visible skips Hidden and visible=false");
+
+		world.setVisible(many[0], true);
+		world.setHidden(many[1], false);
+		world.update(0.f);
+		ofxTest(world.isVisible(many[0]) && world.isVisible(many[1]), "shown again");
+		ofxTestEq(RenderSystem::collectBatches(world.registry).at(0).entities.size(), size_t(4), "all visible after show");
+
+		auto quad = makeQuad(6);
+		auto disk = makeDisk(4, 8);
+		auto box = makeBox(2, 2, 2);
+		ofxTest(quad && quad->getNumVertices() > 0, "makeQuad");
+		ofxTest(disk && disk->getNumVertices() > 0, "makeDisk");
+		ofxTest(box && box->getNumVertices() > 0, "makeBox");
 	}
 
 	void testClone() {

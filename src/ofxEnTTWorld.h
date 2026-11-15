@@ -7,6 +7,7 @@
 #include "ofEvents.h"
 
 #include <functional>
+#include <vector>
 
 namespace ofxEnTT {
 
@@ -35,8 +36,16 @@ public:
 
 	/// New entity with a Transform (and a Name when name isn't empty).
 	Entity create(const std::string & name = "");
+	/// `count` unnamed entities, each with a Transform. Use for instance pools.
+	std::vector<Entity> create(size_t count);
 	/// Destroys the entity and its children, and removes it from its parent.
 	void destroy(Entity entity);
+	/// Adds or removes the Hidden tag. Prefer MeshRenderer.visible for per-frame toggles.
+	void setHidden(Entity entity, bool hidden);
+	bool isHidden(Entity entity) const;
+	/// If the entity has a MeshRenderer, sets visible (no component churn). Else Hidden.
+	void setVisible(Entity entity, bool visible);
+	bool isVisible(Entity entity) const;
 	/// Destroys every entity.
 	void clear();
 	bool isValid(Entity entity) const;

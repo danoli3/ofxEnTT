@@ -61,14 +61,16 @@ signals, snapshots, and your own components. Add your own systems with
 | `Transform` | local position, orientation (quaternion; Euler helpers in degrees), scale |
 | `WorldTransform` | world matrix, written by the TransformSystem each update |
 | `Parent` / `Children` | hierarchy; use `World::setParent` (refuses cycles) |
-| `MeshRenderer` | shared `ofVboMesh`, optional `ofTexture` / `ofMaterial`, colour, draw mode |
-| `Hidden` | tag: not drawn |
+| `MeshRenderer` | shared `ofVboMesh`, optional `ofTexture` / `ofMaterial`, colour, draw mode, `visible` |
+| `Hidden` | tag: not drawn. Prefer `MeshRenderer.visible` when toggling every frame |
 | `Velocity` | linear (units/s) and angular (rad/s) motion |
 | `Lifetime` | destroyed when it reaches zero |
 
 ## World
 
-- `create(name)`, `destroy(e)` (with its children), `clear()`, `size()`, `isValid(e)`
+- `create(name)`, `create(count)` (instance pools), `destroy(e)` (with its children), `clear()`, `size()`, `isValid(e)`
+- `setVisible(e, bool)` / `isVisible`: `MeshRenderer.visible` when the entity has a mesh (no component churn); otherwise the Hidden tag
+- `setHidden(e, bool)` / `isHidden`: add or remove the Hidden tag
 - `setParent(child, parent)`, `getParent`, `getChildren`, `getRoots`, `getEntities`
 - `findByName`, `getName`, `getBounds(e, min, max)` (world-space bounds of e and its children)
 - `clone(e)`: copies an entity and its children, sharing meshes, so the copies draw instanced
@@ -87,11 +89,17 @@ draw calls and entity counts.
 
 Textures are sampled as `sampler2D`: call `ofDisableArbTex()` before loading them.
 
+`MeshRenderer.visible = false` (or `world.setVisible(e, false)`) leaves the entity in the registry and skips it in `collectBatches`. Use that for large pools that show and hide every frame. The Hidden tag is for inspectors and JSON.
+
+2D instance pools (quads, disks) should set `world.renderer.lighting = false` unless the mesh has useful normals. Lighting is already off when a mesh has no normals.
+
+Shared meshes: `makeQuad(w, h)`, `makeDisk(radius, segments)`, `makeBox(w, h, d)` return `shared_ptr<ofVboMesh>` for `MeshRenderer`.
+
 ## JSON
 
 ```cpp
 ofxEnTT::saveJson(world, "scene.json");
-ofxEnTT::loadJson(world, "scene.json");   // Name, Transform, Parent, Velocity, Lifetime, Hidden, colour
+ofxEnTT::loadJson(world, "scene.json");   // Name, Transform, Parent, Velocity, Lifetime, Hidden, colour, visible
 ```
 
 Meshes, textures and materials aren't saved: give them back to the loaded entities, e.g. by name.

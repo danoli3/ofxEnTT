@@ -2,17 +2,18 @@
 
 namespace ofxEnTT {
 
-void TransformSystem::visit(Registry & registry, Entity entity, const glm::mat4 & parentMatrix) {
-	glm::mat4 world = parentMatrix;
+void TransformSystem::visit(Registry & registry, Entity entity, const glm::mat4 * parentMatrix) {
+	glm::mat4 world = parentMatrix ? *parentMatrix : glm::mat4(1.f);
 	if (auto * transform = registry.try_get<Transform>(entity)) {
-		world = parentMatrix * transform->localMatrix();
+		world = transform->localMatrix();
+		if (parentMatrix) world = *parentMatrix * world;
 	}
 	registry.emplace_or_replace<WorldTransform>(entity, world);
 
 	if (auto * children = registry.try_get<Children>(entity)) {
 		for (auto child : children->entities) {
 			if (registry.valid(child)) {
-				visit(registry, child, world);
+				visit(registry, child, &world);
 			}
 		}
 	}
@@ -28,7 +29,7 @@ void TransformSystem::update(Registry & registry) {
 		}
 	}
 	for (auto entity : roots) {
-		visit(registry, entity, glm::mat4(1.f));
+		visit(registry, entity, nullptr);
 	}
 }
 

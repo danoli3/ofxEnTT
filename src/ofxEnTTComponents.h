@@ -36,9 +36,12 @@ struct Transform {
 	glm::vec3 scale { 1.f };
 
 	glm::mat4 localMatrix() const {
-		return glm::translate(glm::mat4(1.f), position)
-			* glm::mat4_cast(orientation)
-			* glm::scale(glm::mat4(1.f), scale);
+		auto matrix = glm::mat4_cast(orientation);
+		matrix[0] *= scale.x;
+		matrix[1] *= scale.y;
+		matrix[2] *= scale.z;
+		matrix[3] = glm::vec4(position, 1.f);
+		return matrix;
 	}
 
 	/// Orientation as Euler angles in degrees (pitch, yaw, roll), like ofNode.
@@ -82,6 +85,9 @@ struct MeshRenderer {
 	/// Per-entity colour, also the per-instance colour when instanced.
 	ofFloatColor color { 1.f, 1.f, 1.f, 1.f };
 	ofPolyRenderMode mode { OF_MESH_FILL };
+	/// False skips the entity in collectBatches without adding/removing Hidden.
+	/// Flip this every frame for large instance pools (Actor trails, voxel grids).
+	bool visible = true;
 };
 
 /// Tag: the RenderSystem skips the entity.

@@ -17,6 +17,52 @@ Entity World::create(const std::string & name) {
 	return entity;
 }
 
+std::vector<Entity> World::create(size_t count) {
+	std::vector<Entity> out;
+	out.reserve(count);
+	for (size_t i = 0; i < count; i++) {
+		out.push_back(create());
+	}
+	return out;
+}
+
+void World::setHidden(Entity entity, bool hidden) {
+	if (!registry.valid(entity)) {
+		return;
+	}
+	const bool has = registry.all_of<Hidden>(entity);
+	if (hidden && !has) {
+		registry.emplace<Hidden>(entity);
+	} else if (!hidden && has) {
+		registry.remove<Hidden>(entity);
+	}
+}
+
+bool World::isHidden(Entity entity) const {
+	return registry.valid(entity) && registry.all_of<Hidden>(entity);
+}
+
+void World::setVisible(Entity entity, bool visible) {
+	if (!registry.valid(entity)) {
+		return;
+	}
+	if (auto * renderer = registry.try_get<MeshRenderer>(entity)) {
+		renderer->visible = visible;
+		return;
+	}
+	setHidden(entity, !visible);
+}
+
+bool World::isVisible(Entity entity) const {
+	if (!registry.valid(entity) || registry.all_of<Hidden>(entity)) {
+		return false;
+	}
+	if (auto * renderer = registry.try_get<MeshRenderer>(entity)) {
+		return renderer->visible;
+	}
+	return true;
+}
+
 void World::detach(Entity entity) {
 	auto * parent = registry.try_get<Parent>(entity);
 	if (!parent) {

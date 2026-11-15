@@ -16,3 +16,4 @@
 #include "ofxEnTTRenderSystem.h"
 #include "ofxEnTTSerialize.h"
 #include "ofxEnTTParameters.h"
+#include "ofxEnTTPrimitives.h"
