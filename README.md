@@ -104,6 +104,15 @@ component addresses; ownership persists for the registry's lifetime. Independent
 sorting those pools or creating conflicting owning groups is then unsupported.
 Entity IDs, built-in motion behavior, and hierarchy semantics stay the same.
 
+`world.transforms.setIncremental(true)` caches local-transform snapshots and
+recomputes matrices only when an entity or its ancestors change. Direct writes to
+position, orientation and scale are detected; `markDirty(entity)` forces a refresh,
+and `invalidate()` discards the snapshots. Reparenting and missing world matrices
+are detected too. The cache is off by default and still visits the hierarchy each
+frame. It adds per-entity memory/comparison work and can lose on frequently moving
+scenes. Only recomputed matrices emit `WorldTransform` update notifications in this
+mode. Inspect `world.transforms.getStats()` for updated/skipped matrix counts.
+
 Reproducible before/after CPU measurements live in [benchmarks](benchmarks/README.md).
 
 ## JSON
