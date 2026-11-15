@@ -95,6 +95,46 @@ Textures are sampled as `sampler2D`: call `ofDisableArbTex()` before loading the
 
 Shared meshes: `makeQuad(w, h)`, `makeDisk(radius, segments)`, `makeBox(w, h, d)` return `shared_ptr<ofVboMesh>` for `MeshRenderer`.
 
+## CPU performance
+
+The merged default paths used **36–51% less CPU frame time** in these measured
+scenes. Compared [the pre-optimization code](https://github.com/danoli3/ofxEnTT/commit/da60c3bc8b321469433fd2215978310fa36912d2)
+with [the six merged optimizations](https://github.com/danoli3/ofxEnTT/commit/76b3900994a753d3e323d26c1475acca73a4793f)
+on 2026-11-15, using identical scenes with 32 mesh batches:
+
+| Scene | Before | Merged defaults | Less time |
+|---|---:|---:|---:|
+| 20,000 linear movers | 1.536 ms | 0.844 ms | 45.1% |
+| 20,000 rotating movers | 1.765 ms | 1.132 ms | 35.9% |
+| 200,000 linear movers | 20.298 ms | 10.022 ms | 50.6% |
+| 200,000 rotating movers | 24.432 ms | 13.406 ms | 45.1% |
+
+Apple M1 Max (10 cores, 64 GiB), macOS 26.6.2, Apple Clang 21, ARM64 Release
+(`-O3 -DNDEBUG`). Medians of 13 samples after four warmup frames, with separate
+executables measured in shuffled serial order. Each sample contains 30 frames at
+20k entities or 10 frames at 200k. Times include complete world updates and CPU
+render-data collection/packing; setup, first allocations, validation, GPU uploads
+and drawing are excluded. These are CPU timings, not measured FPS gains.
+
+For the 200k rotating scene, explicitly enabling the owning group and four total
+threads reduced this CPU stage to **10.876 ms (55.5% less than the old baseline)**.
+Optional paths are workload-dependent: parallel scheduling, transform snapshots,
+and copying bulk particle data back to ECS can cost more than they save. All 46
+comparisons matched exactly in this run across 132,760,000 checked float values.
+
+**Run the examples:** [per-feature benchmarks](benchmarks/README.md) and the
+[full before/after comparison](benchmarks/revisions/README.md). The
+[measurement details](benchmarks/results/merged-vs-baseline.md),
+[raw samples](benchmarks/results/merged-vs-baseline.json), and
+[31-sample bulk follow-up](benchmarks/results/merged-vs-baseline-bulk-followup.json)
+are included in the addon.
+
+Run the combined CPU-frame comparison from the addon root:
+
+```sh
+python3 benchmarks/revisions/run.py --filter pipeline
+```
+
 ## Optional CPU performance paths
 
 `world.enableVelocityGroup()` creates an EnTT owning group for `Transform` and
@@ -220,7 +260,7 @@ upright under `ofEasyCam`).
 | `example_hierarchy` | ofxGui | a solar system of parent / child transforms; s / l save and load JSON |
 | `example_assimp` | ofxAssimpModelLoader, ofxGui | a model as entities, cloned into an instanced grid; drop a model file to swap it |
 | `example_imgui` | [ofxImGui](https://github.com/jvcleave/ofxImGui) (`develop`) | the ImGui inspector on a spinning ring of groups |
-| `example_tests` | ofxUnitTests | the addon's unit tests (headless, 63 checks) |
+| `example_tests` | ofxUnitTests | the addon's headless regression tests |
 
 Generate the project files with projectGenerator, or copy `scripts/templates/<platform>/Makefile`
 and `config.make` (or the CMake template) into the example folder.

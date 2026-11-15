@@ -21,3 +21,5 @@ build/
 .DS_Store
 benchmarks/build/
 benchmarks/bin/
+benchmarks/Makefile
+benchmarks/config.make
