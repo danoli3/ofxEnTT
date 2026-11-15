@@ -20,6 +20,7 @@ class ofApp : public ofxUnitTestsApp {
 		testIncrementalTransforms();
 		testSystems();
 		testVelocityGroup();
+		testLinearMotionBatch();
 		testBatches();
 		testBatchReuse();
 		testVisibility();
@@ -213,6 +214,39 @@ class ofApp : public ofxUnitTestsApp {
 			matches &= a.position == b.position && a.orientation == b.orientation;
 		}
 		ofxTest(matches && grouped.isVelocityGroupEnabled(), "grouped velocity matches views after membership changes and expiry");
+	}
+
+	void testLinearMotionBatch() {
+		World world;
+		world.transforms.setIncremental(true);
+		auto e = world.create(), gone = world.create();
+		LinearMotionBatch batch;
+		batch.reserve(32);
+		batch.add({ 1, 2, 3 }, { 2, -1, .5f }, e);
+		batch.add({ 9, 9, 9 }, { 1, 1, 1 }, gone);
+		batch.add({ 4, 5, 6 }, { 0, 0, 0 });
+		world.destroy(gone);
+		auto replacement = world.create();
+		batch.update(.5f);
+		batch.syncTo(world);
+		world.update(0.f);
+		ofxTest(near(batch.position(0), { 2, 1.5f, 3.25f }), "SoA integrates three axes");
+		ofxTest(near(world.registry.get<WorldTransform>(e).getPosition(), batch.position(0)), "SoA scatter works with incremental transforms");
+		ofxTest(near(world.registry.get<Transform>(replacement).position, { 0, 0, 0 }), "SoA skips deleted entity versions");
+		batch.positionX()[0] = 10.f;
+		batch.setVelocity(0, { 1, 2, 3 });
+		batch.update(-1.f);
+		ofxTest(near(batch.position(0), { 9, -.5f, .25f }), "SoA spans and negative time step");
+		batch.remove(1);
+		ofxTest(batch.size() == 2 && batch.entity(1) == Null && near(batch.position(1), { 4, 5, 6 }), "SoA swap removal keeps arrays and bindings aligned");
+		batch.clear();
+		batch.update(1.f);
+		batch.add({ 0, 0, 0 }, { 1, 1, 1 });
+		batch.update(0.f);
+		ofxTest(batch.size() == 1 && near(batch.position(0), { 0, 0, 0 }), "SoA empty/reused batches and zero time step");
+		bool rejected = false;
+		try { batch.remove(10); } catch (const std::out_of_range &) { rejected = true; }
+		ofxTest(rejected && batch.size() == 1, "SoA removal validates the index");
 	}
 
 	void testBatches() {

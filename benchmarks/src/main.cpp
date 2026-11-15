@@ -2,6 +2,7 @@
 #include "Benchmark.h"
 #include "RenderBench.h"
 #include "MotionBench.h"
+#include "BulkBench.h"
 #include <random>
 
 using namespace ofxEnTT;
@@ -95,6 +96,7 @@ int main() {
 		bench::renderBenchmark();
 		bench::groupsBenchmark();
 		incrementalBenchmark();
+		bench::bulkBenchmark();
 	} catch (const std::exception & error) {
 		std::fprintf(stderr, "%s\n", error.what());
 		return 1;

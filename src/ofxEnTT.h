@@ -17,3 +17,4 @@
 #include "ofxEnTTSerialize.h"
 #include "ofxEnTTParameters.h"
 #include "ofxEnTTPrimitives.h"
+#include "ofxEnTTLinearMotion.h"
