@@ -134,6 +134,27 @@ without permitting mismatched vector lengths. Copying results into ECS component
 has a cost; kernel-only SIMD gains do not imply a faster whole frame. No global
 GLM alignment changes, NEON-only code, or architecture flags are required.
 
+`world.workers.setThreadCount(4)` opts built-in motion into a persistent worker
+pool (four includes the caller). It gathers matched component pointers before
+launching disjoint ranges, joins them, then handles expiry, user systems, deferred
+commands and transforms on the calling thread. Small jobs stay serial;
+`velocityMinItemsPerThread` defaults to 4096. The default thread count is one.
+Extra gathering/scheduling work can lose on cheap motion, so benchmark your scene.
+
+The same executor can run `particles.update(dt, world.workers)` (default minimum
+16384 items/thread) or custom `forEachRange(count, callback, minItemsPerThread)`
+jobs. Callbacks receive `[begin, end)` and must write disjoint data without adding,
+removing or sorting registry components. Use `world.defer([entity](World & w) {
+if (w.isValid(entity)) w.destroy(entity); })` to queue structural work. Commands
+run after all user systems return, before transform propagation; commands queued
+while draining wait for the next update. Cross-worker command ordering is not
+guaranteed. Drain commands and configure/submit jobs only on the calling thread;
+`defer` itself is thread safe. Worker exceptions rethrow after every worker joins.
+The pool supports resizing, rejects nested jobs, and is joined on destruction.
+Ordinary WebAssembly builds without pthread support fall back to one thread.
+Transform propagation remains sequential to preserve parent-before-child order,
+and all GL drawing stays on the calling thread.
+
 Reproducible before/after CPU measurements live in [benchmarks](benchmarks/README.md).
 
 ## JSON

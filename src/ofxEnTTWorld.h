@@ -3,10 +3,12 @@
 #include "ofxEnTTComponents.h"
 #include "ofxEnTTTransformSystem.h"
 #include "ofxEnTTRenderSystem.h"
+#include "ofxEnTTParallel.h"
 
 #include "ofEvents.h"
 
 #include <functional>
+#include <mutex>
 #include <vector>
 
 namespace ofxEnTT {
@@ -25,6 +27,7 @@ namespace ofxEnTT {
 class World {
 public:
 	using System = std::function<void(World &, float)>;
+	using Command = std::function<void(World &)>;
 
 	World() = default;
 	World(const World &) = delete;
@@ -33,6 +36,9 @@ public:
 	Registry registry;
 	TransformSystem transforms;
 	RenderSystem renderer;
+	/// Persistent CPU workers, one calling thread by default.
+	ParallelExecutor workers;
+	size_t velocityMinItemsPerThread = 4096;
 
 	/// New entity with a Transform (and a Name when name isn't empty).
 	Entity create(const std::string & name = "");
@@ -81,6 +87,10 @@ public:
 	void addSystem(const std::string & name, System system);
 	void removeSystem(const std::string & name);
 	bool hasSystem(const std::string & name) const;
+	/// Thread-safe queue for structural edits. Drained on update's calling thread
+	/// after all systems finish and before transform propagation. Commands queued
+	/// while draining run on the next update. Capture entity IDs by value.
+	void defer(Command command);
 
 	/// Opt in once, preferably during setup. Owns/reorders Transform and Velocity
 	/// storage for faster iteration; ownership persists for the registry's life.
@@ -110,11 +120,16 @@ private:
 	std::vector<NamedSystem> systems;
 	std::vector<Entity> expired;
 	bool velocityGroupEnabled = false;
+	struct MotionItem { Transform * transform; const Velocity * velocity; };
+	std::vector<MotionItem> motionItems;
+	std::mutex commandMutex;
+	std::vector<Command> commands, executingCommands;
 	ofEventListener updateListener;
 	ofEventListener drawListener;
 
 	void updateVelocity(float deltaSeconds);
 	void updateLifetime(float deltaSeconds);
+	void applyDeferred();
 	void detach(Entity entity);
 };
 

@@ -1,5 +1,6 @@
 #include "ofxEnTTLinearMotion.h"
 #include "ofxEnTTWorld.h"
+#include "ofxEnTTParallel.h"
 #include <algorithm>
 #include <stdexcept>
 
@@ -51,6 +52,10 @@ void LinearMotionBatch::integrate(size_t begin, size_t end, float dt) {
 }
 
 void LinearMotionBatch::update(float dt) { integrate(0, size(), dt); }
+
+void LinearMotionBatch::update(float dt, ParallelExecutor & executor, size_t minItemsPerThread) {
+	executor.forEachRange(size(), [this, dt](size_t begin, size_t end) { integrate(begin, end, dt); }, minItemsPerThread);
+}
 
 void LinearMotionBatch::syncTo(World & world) const {
 	for (size_t i = 0; i < size(); ++i) {
