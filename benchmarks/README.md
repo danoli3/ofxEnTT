@@ -37,3 +37,14 @@ all matrix columns and colors; every packed value contributes to the checksum.
 The buffers for packed GPU inputs are retained on both sides, as before this PR.
 Roots and expired-entity scratch vectors also retain capacity, but are not timed
 separately. No GPU work or GL context is used.
+
+## Optional owning group
+
+The owning-group comparison uses the same built-in integration helper with an
+EnTT view versus an owning group. It covers 20k and 200k movers, with either zero
+angular velocity or quaternion integration. Every seventh Velocity is removed and
+reinserted before group creation. The group is created once before timing;
+creation/reordering cost is excluded. 20k cases use 20 frames per sample and 200k
+cases use 5. All positions and orientations are compared by entity after timing.
+The inline checksum adds the same per-entity arithmetic to both paths. This
+measures motion only, excluding world-transform propagation, rendering, and setup.

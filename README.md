@@ -95,6 +95,17 @@ Textures are sampled as `sampler2D`: call `ofDisableArbTex()` before loading the
 
 Shared meshes: `makeQuad(w, h)`, `makeDisk(radius, segments)`, `makeBox(w, h, d)` return `shared_ptr<ofVboMesh>` for `MeshRenderer`.
 
+## Optional CPU performance paths
+
+`world.enableVelocityGroup()` creates an EnTT owning group for `Transform` and
+`Velocity`. Call it during setup if most of your work iterates those two types.
+It is off by default. Group creation reorders both pools, invalidating cached
+component addresses; ownership persists for the registry's lifetime. Independently
+sorting those pools or creating conflicting owning groups is then unsupported.
+Entity IDs, built-in motion behavior, and hierarchy semantics stay the same.
+
+Reproducible before/after CPU measurements live in [benchmarks](benchmarks/README.md).
+
 ## JSON
 
 ```cpp

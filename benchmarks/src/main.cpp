@@ -1,6 +1,7 @@
 #include "ofxEnTT.h"
 #include "Benchmark.h"
 #include "RenderBench.h"
+#include "MotionBench.h"
 #include <random>
 
 using namespace ofxEnTT;
@@ -72,6 +73,7 @@ int main() {
 	try {
 		transformsBenchmark();
 		bench::renderBenchmark();
+		bench::groupsBenchmark();
 	} catch (const std::exception & error) {
 		std::fprintf(stderr, "%s\n", error.what());
 		return 1;

@@ -1,4 +1,5 @@
 #include "ofxEnTTWorld.h"
+#include "detail/ofxEnTTMotion.h"
 
 #include "ofUtils.h"
 #include "ofAppRunner.h"
@@ -244,12 +245,14 @@ bool World::hasSystem(const std::string & name) const {
 		[&](const NamedSystem & s) { return s.name == name; });
 }
 
+void World::enableVelocityGroup() {
+	registry.group<Transform, Velocity>();
+	velocityGroupEnabled = true;
+}
+
 void World::updateVelocity(float dt) {
-	registry.view<Transform, const Velocity>().each([dt](Transform & transform, const Velocity & velocity) {
-		transform.position += velocity.linear * dt;
-		if (glm::length(velocity.angular) > 0.f) {
-			transform.orientation = glm::normalize(glm::quat(velocity.angular * dt) * transform.orientation);
-		}
+	detail::forEachVelocity(registry, velocityGroupEnabled, [dt](Transform & transform, const Velocity & velocity) {
+		detail::integrateVelocity(transform, velocity, dt);
 	});
 }
 
