@@ -18,6 +18,7 @@ class ofApp : public ofxUnitTestsApp {
 		testWorldTransforms();
 		testDirectTransforms();
 		testSystems();
+		testVelocityGroup();
 		testBatches();
 		testBatchReuse();
 		testVisibility();
@@ -139,6 +140,30 @@ class ofApp : public ofxUnitTestsApp {
 		world.builtInSystems = false;
 		world.update(1.f);
 		ofxTest(near(world.registry.get<Transform>(mover).position, { 1.0f, 0, 0 }), "builtInSystems off stops Velocity");
+	}
+
+	void testVelocityGroup() {
+		World plain, grouped;
+		ofxTest(!grouped.isVelocityGroupEnabled(), "velocity group is opt in");
+		grouped.enableVelocityGroup();
+		grouped.enableVelocityGroup();
+		for (World * world : { &plain, &grouped }) {
+			for (int i = 0; i < 24; ++i) {
+				auto e = world->create();
+				world->registry.emplace<Velocity>(e, glm::vec3(i, .5f, -1.f), glm::vec3(.1f, .2f, .3f));
+				if (i == 5) world->registry.remove<Velocity>(e);
+				if (i == 9) world->registry.emplace<Lifetime>(e, .1f);
+			}
+			world->update(.25f);
+			world->update(.25f);
+		}
+		bool matches = plain.size() == grouped.size();
+		for (auto e : plain.getEntities()) {
+			const auto & a = plain.registry.get<Transform>(e);
+			const auto & b = grouped.registry.get<Transform>(e);
+			matches &= a.position == b.position && a.orientation == b.orientation;
+		}
+		ofxTest(matches && grouped.isVelocityGroupEnabled(), "grouped velocity matches views after membership changes and expiry");
 	}
 
 	void testBatches() {

@@ -82,6 +82,12 @@ public:
 	void removeSystem(const std::string & name);
 	bool hasSystem(const std::string & name) const;
 
+	/// Opt in once, preferably during setup. Owns/reorders Transform and Velocity
+	/// storage for faster iteration; ownership persists for the registry's life.
+	/// These pools must not be independently sorted or owned by conflicting groups.
+	void enableVelocityGroup();
+	bool isVelocityGroupEnabled() const { return velocityGroupEnabled; }
+
 	/// Runs the systems with this frame's time step.
 	void update();
 	void update(float deltaSeconds);
@@ -103,6 +109,7 @@ private:
 	};
 	std::vector<NamedSystem> systems;
 	std::vector<Entity> expired;
+	bool velocityGroupEnabled = false;
 	ofEventListener updateListener;
 	ofEventListener drawListener;
 
