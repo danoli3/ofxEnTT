@@ -72,3 +72,38 @@ Separate 20k/200k comparisons include both bulk integration and its serial scatt
 to ECS Transforms, versus built-in view-based motion with zero angular velocities.
 All local positions are checked by entity. Both exclude world-matrix propagation
 and drawing. No kernel-only result should be read as an end-to-end ECS speedup.
+
+## Optional parallel CPU updates
+
+Four total threads (three persistent workers plus the caller) versus one. World
+comparisons include complete update calls: pointer gathering, scheduling, joins,
+expiry scans, command draining, and serial world-transform propagation. Both worlds
+use the same optional owning group. There are 20k/200k movers with zero or nonzero
+angular velocity. Every local position and orientation is checked afterward.
+
+Separate SoA comparisons cover 20k/200k/2M particles, including scheduling and joins
+but excluding ECS scatter. Inputs below 2 × 16384 items use the caller; this includes
+the 20k case. Initial thread creation and first buffer allocations are excluded by
+warmup. Samples use 20 frames for 20k and 5 for larger inputs. The result depends on
+core count, scheduling, memory bandwidth and whether the arithmetic is expensive
+enough to amortize gathering. There is no parallel GL work or hierarchy scheduler.
+
+### Worker stress check with ThreadSanitizer
+
+This standalone check does not link openFrameworks. It runs 700 uneven jobs,
+changes pool sizes, and checks exception recovery:
+
+```sh
+clang++ -std=c++20 -O1 -g -fsanitize=thread -fno-omit-frame-pointer -I src \
+  src/ofxEnTTParallel.cpp benchmarks/tests/parallel_stress.cpp -o /tmp/ofxentt-parallel-stress
+/tmp/ofxentt-parallel-stress
+```
+
+To check the threadless fallback on a native compiler, build the same two sources
+with `-D__EMSCRIPTEN__` and without `-fsanitize=thread`. This exercises the fallback
+selection, not a full WebAssembly build.
+
+For the local mixed-ASan/prebuilt-core limitation and a core-only reproducer, see
+[parallel-motion results](results/parallel-motion.md#correctness-and-sanitizer-evidence).
+Do not interpret a qualified run with container annotations disabled as an
+unrestricted sanitizer pass. A consistently ASan-built core is the preferred setup.

@@ -2,6 +2,8 @@
 #include "ofAppNoWindow.h"
 #include "ofxUnitTests.h"
 #include "ofxEnTT.h"
+#include <algorithm>
+#include <stdexcept>
 
 using namespace ofxEnTT;
 
@@ -21,6 +23,8 @@ class ofApp : public ofxUnitTestsApp {
 		testSystems();
 		testVelocityGroup();
 		testLinearMotionBatch();
+		testParallelExecutor();
+		testParallelWorld();
 		testBatches();
 		testBatchReuse();
 		testVisibility();
@@ -247,6 +251,87 @@ class ofApp : public ofxUnitTestsApp {
 		bool rejected = false;
 		try { batch.remove(10); } catch (const std::out_of_range &) { rejected = true; }
 		ofxTest(rejected && batch.size() == 1, "SoA removal validates the index");
+	}
+
+	void testParallelExecutor() {
+		ParallelExecutor executor;
+		ofxTestEq(executor.getThreadCount(), size_t(1), "workers are opt in");
+		executor.setThreadCount(4);
+		std::vector<int> visits(10003);
+		for (int frame = 0; frame < 4; ++frame) executor.forEachRange(visits.size(), [&](size_t begin, size_t end) {
+			for (size_t i = begin; i < end; ++i) visits[i]++;
+		}, 1);
+		ofxTest(std::all_of(visits.begin(), visits.end(), [](int v) { return v == 4; }), "parallel ranges cover uneven input exactly once");
+		bool emptyCalled = false;
+		executor.forEachRange(0, [&](size_t, size_t) { emptyCalled = true; });
+		ofxTest(!emptyCalled, "empty parallel jobs do not invoke a callback");
+		bool caught = false;
+		try {
+			executor.forEachRange(100, [](size_t begin, size_t end) {
+				if (begin <= 75 && end > 75) throw std::runtime_error("expected worker error");
+			}, 1);
+		} catch (const std::runtime_error &) { caught = true; }
+		ofxTest(caught, "worker exceptions return to the calling thread");
+		executor.setThreadCount(2);
+		executor.forEachRange(visits.size(), [&](size_t begin, size_t end) {
+			for (size_t i = begin; i < end; ++i) visits[i]++;
+		}, 1);
+		ofxTest(std::all_of(visits.begin(), visits.end(), [](int v) { return v == 5; }), "worker pool survives exceptions and resizing");
+		caught = false;
+		try { executor.forEachRange(1, [&](size_t, size_t) { executor.forEachRange(1, [](size_t, size_t) {}); }); }
+		catch (const std::logic_error &) { caught = true; }
+		ofxTest(caught, "nested jobs are rejected instead of deadlocking");
+		executor.setThreadCount(0);
+		ofxTestEq(executor.getThreadCount(), size_t(1), "zero thread count restores serial execution");
+		LinearMotionBatch serial, parallel;
+		for (int i = 0; i < 10003; ++i) { serial.add(glm::vec3(i), glm::vec3(.25f)); parallel.add(glm::vec3(i), glm::vec3(.25f)); }
+		executor.setThreadCount(4);
+		serial.update(.5f); parallel.update(.5f, executor, 1);
+		bool matches = true;
+		for (size_t i = 0; i < serial.size(); ++i) matches &= near(serial.position(i), parallel.position(i));
+		ofxTest(matches, "parallel SoA motion matches serial motion");
+	}
+
+	void testParallelWorld() {
+		World serial, parallel;
+		parallel.workers.setThreadCount(4);
+		parallel.velocityMinItemsPerThread = 1;
+		parallel.enableVelocityGroup();
+		for (World * world : { &serial, &parallel }) {
+			world->transforms.setIncremental(true);
+			auto entities = world->create(size_t(1000));
+			for (size_t i = 0; i < entities.size(); ++i) {
+				world->registry.emplace<Velocity>(entities[i], glm::vec3(.1f, i % 5, -.3f), glm::vec3(.1f, .2f, .3f));
+				if (i % 8) world->setParent(entities[i], entities[i - 1]);
+				if (i == 16) world->registry.emplace<Lifetime>(entities[i], .1f);
+			}
+			world->update(.25f); world->update(.25f);
+		}
+		bool matches = serial.size() == parallel.size();
+		for (auto e : serial.getEntities()) {
+			matches &= near(serial.registry.get<Transform>(e).position, parallel.registry.get<Transform>(e).position);
+			matches &= near(serial.registry.get<WorldTransform>(e).getPosition(), parallel.registry.get<WorldTransform>(e).getPosition());
+		}
+		ofxTest(matches, "parallel velocity joins before expiry and incremental hierarchy updates");
+		auto entities = parallel.getEntities();
+		bool deferred = false;
+		parallel.addSystem("queue", [&](World & w, float) {
+			w.workers.forEachRange(entities.size(), [&](size_t begin, size_t end) {
+				for (size_t i = begin; i < end; ++i) w.defer([e = entities[i]](World & target) {
+					if (target.isValid(e)) target.registry.emplace_or_replace<Hidden>(e);
+				});
+			}, 1);
+			deferred = w.registry.view<Hidden>().size() == 0;
+		});
+		parallel.update(0.f);
+		ofxTest(deferred && parallel.registry.view<Hidden>().size() == parallel.size(), "worker structural commands apply after systems join");
+		parallel.removeSystem("queue");
+		bool first = false, next = false;
+		parallel.defer([&](World & w) { first = true; w.defer([&](World &) { next = true; }); });
+		parallel.update(0.f);
+		ofxTest(first && !next, "commands queued during draining wait for the next update");
+		parallel.update(0.f);
+		ofxTest(next, "deferred commands survive until the next update");
 	}
 
 	void testBatches() {

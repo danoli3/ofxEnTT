@@ -251,9 +251,39 @@ void World::enableVelocityGroup() {
 }
 
 void World::updateVelocity(float dt) {
+	const auto estimate = registry.view<Transform, Velocity>().size_hint();
+	if (workers.getThreadCount() > 1 && estimate / std::max<size_t>(velocityMinItemsPerThread, 1) >= 2) {
+		motionItems.clear();
+		motionItems.reserve(estimate);
+		detail::forEachVelocity(registry, velocityGroupEnabled, [&](Transform & transform, const Velocity & velocity) {
+			motionItems.push_back({ &transform, &velocity });
+		});
+		workers.forEachRange(motionItems.size(), [&](size_t begin, size_t end) {
+			for (size_t i = begin; i < end; ++i)
+				detail::integrateVelocity(*motionItems[i].transform, *motionItems[i].velocity, dt);
+		}, velocityMinItemsPerThread);
+		motionItems.clear();
+		return;
+	}
 	detail::forEachVelocity(registry, velocityGroupEnabled, [dt](Transform & transform, const Velocity & velocity) {
 		detail::integrateVelocity(transform, velocity, dt);
 	});
+}
+
+void World::defer(Command command) {
+	if (!command) return;
+	std::lock_guard lock(commandMutex);
+	commands.push_back(std::move(command));
+}
+
+void World::applyDeferred() {
+	{
+		std::lock_guard lock(commandMutex);
+		executingCommands.clear();
+		executingCommands.swap(commands);
+	}
+	for (auto & command : executingCommands) command(*this);
+	executingCommands.clear();
 }
 
 void World::updateLifetime(float dt) {
@@ -281,6 +311,7 @@ void World::update(float dt) {
 	for (auto & s : systems) {
 		s.system(*this, dt);
 	}
+	applyDeferred();
 	transforms.update(registry);
 }
 

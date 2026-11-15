@@ -5,6 +5,7 @@
 
 namespace ofxEnTT {
 class World;
+class ParallelExecutor;
 
 /// Optional structure-of-arrays storage for independent linear particles.
 /// Positions/velocities live here; syncTo() explicitly copies positions to bound
@@ -32,6 +33,7 @@ public:
 	std::span<float> velocityZ() { return vz; }
 
 	void update(float deltaSeconds);
+	void update(float deltaSeconds, ParallelExecutor & executor, size_t minItemsPerThread = 16384);
 	/// Serial scatter. Skips deleted/unbound entities and entities without Transform.
 	/// Does not create components, rotate entities, or update world matrices.
 	void syncTo(World & world) const;
