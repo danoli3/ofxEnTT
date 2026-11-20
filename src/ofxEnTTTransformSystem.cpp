@@ -81,9 +81,13 @@ void TransformSystem::update(Registry & registry) {
 		visit(registry, entity, nullptr, Null, false);
 	}
 	if (incremental) {
-		for (auto it = cache.begin(); it != cache.end();) {
-			if (it->second.lastSeen != frame) it = cache.erase(it);
-			else ++it;
+		// Skip the full-cache scan when every entry was visited this frame.
+		const size_t visited = stats.updated + stats.skipped;
+		if (visited != cache.size()) {
+			for (auto it = cache.begin(); it != cache.end();) {
+				if (it->second.lastSeen != frame) it = cache.erase(it);
+				else ++it;
+			}
 		}
 	}
 }
