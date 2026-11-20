@@ -83,7 +83,10 @@ void World::destroy(Entity entity) {
 		return;
 	}
 	if (auto * children = registry.try_get<Children>(entity)) {
-		auto list = children->entities;
+		// Move the list out so recursive detach() calls see an empty siblings
+		// vector and skip the per-child linear erase: O(N) instead of O(N^2).
+		auto list = std::move(children->entities);
+		children->entities.clear();
 		for (auto child : list) {
 			destroy(child);
 		}
@@ -152,15 +155,20 @@ std::vector<Entity> World::getEntities() const {
 }
 
 std::vector<Entity> World::getRoots() const {
-	auto result = getEntities();
-	result.erase(std::remove_if(result.begin(), result.end(),
-		[this](Entity e) { return registry.all_of<Parent>(e); }), result.end());
+	std::vector<Entity> result;
+	for (auto entity : registry.view<Entity>()) {
+		if (!registry.all_of<Parent>(entity)) {
+			result.push_back(entity);
+		}
+	}
+	// storage order is most recent first; creation order reads better
+	std::reverse(result.begin(), result.end());
 	return result;
 }
 
 Entity World::findByName(const std::string & name) const {
-	for (auto entity : getEntities()) {
-		if (auto * n = registry.try_get<Name>(entity); n && n->value == name) {
+	for (auto [entity, n] : registry.view<const Name>().each()) {
+		if (n.value == name) {
 			return entity;
 		}
 	}
