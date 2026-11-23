@@ -2,6 +2,10 @@
 #include "ofAppNoWindow.h"
 #include "ofxUnitTests.h"
 #include "ofxEnTT.h"
+// The scene builders live with their examples; tests reach into them directly
+// so the examples stay the single source of truth.
+#include "../../example_aquarium/src/aquariumScene.h"
+#include "../../example_mineent/src/mineentScene.h"
 #include <algorithm>
 #include <stdexcept>
 
@@ -31,6 +35,8 @@ class ofApp : public ofxUnitTestsApp {
 		testClone();
 		testJson();
 		testParameters();
+		testAquariumScene();
+		testMineentScene();
 	}
 
 	void testCreateDestroy() {
@@ -505,6 +511,80 @@ class ofApp : public ofxUnitTestsApp {
 		world.destroy(e);
 		params.pull();
 		ofxTestEq(params.group.size(), size_t(0), "destroyed entity empties the group");
+	}
+
+	void testAquariumScene() {
+		World world;
+		aquarium::SceneConfig config;
+		config.half = { 100.f, 50.f, 100.f };
+		auto meshA = aquarium::makeFishMesh(20.f);
+		auto meshB = aquarium::makeFishMesh(14.f);
+		config.species = {
+			{ meshA, ofFloatColor(0.2f, 0.5f, 1.f), 1.f, 1.f, 5 },
+			{ meshB, ofFloatColor(1.f, 0.8f, 0.2f), 1.f, 1.f, 3 },
+		};
+		const size_t built = aquarium::build(world, config);
+		ofxTestEq(built, size_t(8), "aquarium builds fish for each species");
+		ofxTestEq(world.size(), size_t(8), "aquarium world size matches build return");
+
+		size_t withSwim = 0, withRenderer = 0;
+		for (auto [e, swim] : world.registry.view<aquarium::Swim>().each()) {
+			(void)e; (void)swim; withSwim++;
+		}
+		for (auto [e, r] : world.registry.view<MeshRenderer>().each()) {
+			(void)e; (void)r; withRenderer++;
+		}
+		ofxTestEq(withSwim, size_t(8), "every fish has a Swim component");
+		ofxTestEq(withRenderer, size_t(8), "every fish has a MeshRenderer");
+
+		// Determinism from the seed.
+		World other;
+		aquarium::build(other, config);
+		auto firstPosA = world.registry.view<Transform, aquarium::Swim>().get<Transform>(
+			*world.registry.view<Transform, aquarium::Swim>().begin()).position;
+		auto firstPosB = other.registry.view<Transform, aquarium::Swim>().get<Transform>(
+			*other.registry.view<Transform, aquarium::Swim>().begin()).position;
+		ofxTest(near(firstPosA, firstPosB), "aquarium seed is deterministic");
+
+		// Two species => two instanced batches in a collectBatches pass.
+		world.update();
+		auto batches = RenderSystem::collectBatches(world.registry);
+		ofxTestEq(batches.size(), size_t(2), "one batch per species (same mesh+mode)");
+
+		// Swim system actually moves fish.
+		auto before = world.registry.get<Transform>(*world.registry.view<aquarium::Swim>().begin()).position;
+		aquarium::swim(world, config, 0.1f);
+		auto after = world.registry.get<Transform>(*world.registry.view<aquarium::Swim>().begin()).position;
+		ofxTest(!near(before, after, 1e-3f), "swim system advances positions");
+	}
+
+	void testMineentScene() {
+		World world;
+		mineent::SceneConfig config;
+		config.radius = 4;
+		config.maxHeight = 5;
+		config.treeCount = 2;
+		auto cube = std::make_shared<ofVboMesh>(ofMesh::box(1.f, 1.f, 1.f, 1, 1, 1));
+		const auto stats = mineent::build(world, cube, config);
+
+		const int side = config.radius * 2 + 1;
+		ofxTestEq(stats.columns, size_t(side * side), "mineent columns matches patch size");
+		ofxTest(stats.terrainBlocks >= stats.columns, "every column places at least its surface block");
+		ofxTestEq(world.size(), stats.terrainBlocks + stats.treeBlocks,
+			"entity count matches reported stats");
+
+		// Every block entity shares the cube mesh, so the renderer packs them
+		// into a single instanced batch regardless of palette colour.
+		world.update();
+		auto batches = RenderSystem::collectBatches(world.registry);
+		ofxTestEq(batches.size(), size_t(1), "one shared cube mesh produces one batch");
+		ofxTestEq(batches[0].entities.size(), world.size(), "batch covers every block");
+
+		// Determinism from the seed.
+		World other;
+		const auto stats2 = mineent::build(other, cube, config);
+		ofxTestEq(stats2.terrainBlocks, stats.terrainBlocks, "mineent seed is deterministic (terrain)");
+		ofxTestEq(stats2.treeBlocks, stats.treeBlocks, "mineent seed is deterministic (trees)");
 	}
 };
 
