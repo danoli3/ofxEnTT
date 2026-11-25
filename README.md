@@ -123,6 +123,25 @@ and copying bulk particle data back to ECS can cost more than they save. All 46
 comparisons recorded zero numerical difference across 132,760,000 checked float
 values; signed-zero bit patterns can differ.
 
+### Subtree destroy and transform-cache cleanup
+
+Later targeted fixes on top of the merged defaults, measured on the same
+hardware with `benchmarks/src/WorldBench.h`:
+
+| Scene | Before | After | Less time |
+|---|---:|---:|---:|
+| destroy root + 500 siblings | 106 μs | 50 μs | 52.8% |
+| destroy root + 2,000 siblings | 902 μs | 171 μs | 81.0% |
+| destroy root + 8,000 siblings | 12.33 ms | 0.74 ms | 94.0% |
+| incremental cache scan / 20,000 stable | 6.65 μs | 0 μs | ~100% |
+| incremental cache scan / 200,000 stable | 66.6 μs | 0 μs | ~100% |
+
+Subtree destroy moves the children list out before recursing, so each child's
+`detach()` sees an empty siblings vector and skips the per-child linear erase —
+turning N-sibling teardown from O(N²) into O(N). The transform cache now skips
+its stale-entry sweep when every entry was visited this frame, so stable
+scenes pay no cleanup cost.
+
 **Run the examples:** [per-feature benchmarks](benchmarks/README.md) and the
 [full before/after comparison](benchmarks/revisions/README.md). The
 [measurement details](benchmarks/results/merged-vs-baseline.md),

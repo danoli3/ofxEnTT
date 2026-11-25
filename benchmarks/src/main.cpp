@@ -4,6 +4,7 @@
 #include "MotionBench.h"
 #include "BulkBench.h"
 #include "ParallelBench.h"
+#include "WorldBench.h"
 #include <random>
 
 using namespace ofxEnTT;
@@ -99,6 +100,7 @@ int main() {
 		incrementalBenchmark();
 		bench::bulkBenchmark();
 		bench::parallelBenchmark();
+		bench::worldBenchmark();
 	} catch (const std::exception & error) {
 		std::fprintf(stderr, "%s\n", error.what());
 		return 1;
