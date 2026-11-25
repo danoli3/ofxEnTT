@@ -575,10 +575,15 @@ class ofApp : public ofxUnitTestsApp {
 
 		// Every block entity shares the cube mesh, so the renderer packs them
 		// into a single instanced batch regardless of palette colour.
+		// world.update() must run first: collectBatches reads WorldTransform
+		// (written by TransformSystem). Guard the vector access so a future
+		// regression reports a test failure instead of crashing the suite.
 		world.update();
 		auto batches = RenderSystem::collectBatches(world.registry);
 		ofxTestEq(batches.size(), size_t(1), "one shared cube mesh produces one batch");
-		ofxTestEq(batches[0].entities.size(), world.size(), "batch covers every block");
+		if (!batches.empty()) {
+			ofxTestEq(batches[0].entities.size(), world.size(), "batch covers every block");
+		}
 
 		// Determinism from the seed.
 		World other;
