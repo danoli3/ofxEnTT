@@ -261,7 +261,15 @@ upright under `ofEasyCam`).
 | `example_hierarchy` | ofxGui | a solar system of parent / child transforms; s / l save and load JSON |
 | `example_assimp` | ofxAssimpModelLoader, ofxGui | a model as entities, cloned into an instanced grid; drop a model file to swap it |
 | `example_imgui` | [ofxImGui](https://github.com/jvcleave/ofxImGui) (`develop`) | the ImGui inspector on a spinning ring of groups |
+| `example_aquarium` | — | a school of fish swimming in a bounded tank, one instanced call per species, driven by a tiny custom Swim system |
+| `example_mineent` | — | a Minecraft-like voxel world generated from a seeded heightmap; one shared cube mesh means one instanced draw call for the whole terrain |
 | `example_tests` | ofxUnitTests | the addon's headless regression tests |
+
+![example_aquarium: three species of fish swimming in a bounded tank](docs/images/example_aquarium.jpg)
+*`example_aquarium`: 539 fish across three species, 3 instanced draw calls (one per species) plus the floor quad.*
+
+![example_mineent: a voxel world of grass, dirt, stone, sand and tree blocks](docs/images/example_mineent.jpg)
+*`example_mineent`: 3,528 blocks (terrain + trees) in one instanced draw call.*
 
 Generate the project files with projectGenerator, or copy `scripts/templates/<platform>/Makefile`
 and `config.make` (or the CMake template) into the example folder.
