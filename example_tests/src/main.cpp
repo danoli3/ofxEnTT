@@ -37,6 +37,9 @@ class ofApp : public ofxUnitTestsApp {
 		testParameters();
 		testAquariumScene();
 		testMineentScene();
+		testEvents();
+		testSpatialHash();
+		testCulling();
 	}
 
 	void testCreateDestroy() {
@@ -590,6 +593,118 @@ class ofApp : public ofxUnitTestsApp {
 		const auto stats2 = mineent::build(other, cube, config);
 		ofxTestEq(stats2.terrainBlocks, stats.terrainBlocks, "mineent seed is deterministic (terrain)");
 		ofxTestEq(stats2.treeBlocks, stats.treeBlocks, "mineent seed is deterministic (trees)");
+	}
+
+	void testEvents() {
+		struct HitEvent { int damage; };
+		struct Listener {
+			int hits = 0;
+			int total = 0;
+			void onHit(const HitEvent & e) { ++hits; total += e.damage; }
+		};
+		World world;
+		Listener listener;
+		world.events.sink<HitEvent>().connect<&Listener::onHit>(listener);
+		world.events.trigger(HitEvent { 3 });
+		world.events.trigger(HitEvent { 5 });
+		ofxTestEq(listener.hits, 2, "events dispatch to connected sinks");
+		ofxTestEq(listener.total, 8, "event payload is passed through");
+
+		world.events.sink<HitEvent>().disconnect<&Listener::onHit>(listener);
+		world.events.trigger(HitEvent { 100 });
+		ofxTestEq(listener.hits, 2, "disconnected sink stops receiving");
+
+		// Events with no listeners must be free of surprise side effects.
+		struct SilentEvent {};
+		world.events.trigger(SilentEvent {});
+		ofxTest(true, "unobserved events do not throw");
+	}
+
+	void testSpatialHash() {
+		World world;
+		SpatialHash hash;
+		hash.setCellSize(10.f);
+
+		// Grid of 5x5 blocks spaced 10 units apart on x/z.
+		for (int z = 0; z < 5; ++z) {
+			for (int x = 0; x < 5; ++x) {
+				auto e = world.create();
+				world.registry.get<Transform>(e).position = { x * 10.f, 0.f, z * 10.f };
+				world.registry.emplace<LocalBounds>(e, glm::vec3(-0.5f), glm::vec3(0.5f));
+				world.registry.emplace<SpatialMember>(e);
+			}
+		}
+		// Add a non-member so we can confirm the hash ignores it.
+		auto outsider = world.create();
+		world.registry.get<Transform>(outsider).position = { 2.f, 0.f, 2.f };
+		world.registry.emplace<LocalBounds>(outsider);
+
+		world.update();
+		hash.rebuild(world.registry);
+		ofxTestEq(hash.getStats().entities, size_t(25), "spatial hash indexes members only");
+
+		std::vector<Entity> found;
+		hash.queryRadius(glm::vec3(20.f, 0.f, 20.f), 15.f, [&](Entity e) {
+			found.push_back(e);
+		});
+		// Dedup: an entity can appear in several cells.
+		std::sort(found.begin(), found.end());
+		found.erase(std::unique(found.begin(), found.end()), found.end());
+		ofxTest(!found.empty(), "spatial query returns entities near the point");
+		for (auto e : found) {
+			ofxTest(world.registry.all_of<SpatialMember>(e),
+				"query results carry SpatialMember");
+		}
+
+		hash.clear();
+		ofxTestEq(hash.getStats().entities, size_t(0), "clear resets stats");
+	}
+
+	void testCulling() {
+		World world;
+		auto cube = std::make_shared<ofVboMesh>(ofMesh::box(1.f, 1.f, 1.f, 1, 1, 1));
+		auto inside = world.create();
+		world.registry.get<Transform>(inside).position = { 0.f, 0.f, -5.f };
+		world.registry.emplace<LocalBounds>(inside, glm::vec3(-0.5f), glm::vec3(0.5f));
+		world.registry.emplace<MeshRenderer>(inside).mesh = cube;
+
+		auto behind = world.create();
+		world.registry.get<Transform>(behind).position = { 0.f, 0.f, 500.f };
+		world.registry.emplace<LocalBounds>(behind, glm::vec3(-0.5f), glm::vec3(0.5f));
+		world.registry.emplace<MeshRenderer>(behind).mesh = cube;
+
+		auto unbounded = world.create();
+		world.registry.get<Transform>(unbounded).position = { 0.f, 0.f, 500.f };
+		world.registry.emplace<MeshRenderer>(unbounded).mesh = cube;
+
+		world.update();
+
+		// Camera at origin looking down -Z, 60 deg fov, 0.1..100 range.
+		const glm::mat4 proj = glm::perspective(glm::radians(60.f), 1.f, 0.1f, 100.f);
+		const glm::mat4 view = glm::lookAt(glm::vec3(0.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+
+		CullingSystem culling;
+		culling.update(world.registry, proj * view);
+		ofxTestEq(culling.getStats().tested, size_t(2), "only bounded entities are tested");
+		ofxTest(culling.getStats().culled >= 1, "the far-behind cube is culled");
+		ofxTest(!world.registry.all_of<Culled>(inside), "visible cube is not tagged");
+		ofxTest(world.registry.all_of<Culled>(behind), "off-screen cube is tagged");
+		ofxTest(!world.registry.all_of<Culled>(unbounded), "unbounded entities are never tagged");
+
+		// The renderer's batch collection must skip Culled entities.
+		auto batches = RenderSystem::collectBatches(world.registry);
+		size_t rendered = 0;
+		for (const auto & batch : batches) rendered += batch.entities.size();
+		ofxTestEq(rendered, size_t(2), "collectBatches skips culled entities");
+
+		// Rerun on a wide-open frustum that contains everything.
+		const glm::mat4 bigProj = glm::perspective(glm::radians(170.f), 1.f, 0.1f, 1000.f);
+		const glm::mat4 bigView = glm::lookAt(glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 1.f, 0.f));
+		culling.update(world.registry, bigProj * bigView);
+		ofxTest(!world.registry.all_of<Culled>(behind), "culling clears the tag when back in view");
+
+		culling.clearTags(world.registry);
+		ofxTestEq(world.registry.view<Culled>().size(), size_t(0), "clearTags empties the Culled pool");
 	}
 };
 

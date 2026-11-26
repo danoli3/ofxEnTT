@@ -36,6 +36,10 @@ public:
 	Registry registry;
 	TransformSystem transforms;
 	RenderSystem renderer;
+	/// Cross-system event bus. Systems trigger<EventT>(payload) and connect
+	/// sinks with events.sink<EventT>().connect<&Listener::handle>(instance).
+	/// Zero-cost when unused: no fan-out runs for events nobody listens for.
+	entt::dispatcher events;
 	/// Persistent CPU workers, one calling thread by default.
 	ParallelExecutor workers;
 	size_t velocityMinItemsPerThread = 4096;

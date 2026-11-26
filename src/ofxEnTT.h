@@ -14,6 +14,8 @@
 #include "ofxEnTTWorld.h"
 #include "ofxEnTTTransformSystem.h"
 #include "ofxEnTTRenderSystem.h"
+#include "ofxEnTTSpatial.h"
+#include "ofxEnTTCulling.h"
 #include "ofxEnTTSerialize.h"
 #include "ofxEnTTParameters.h"
 #include "ofxEnTTPrimitives.h"

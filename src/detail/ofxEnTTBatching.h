@@ -47,7 +47,7 @@ size_t collectBatches(Registry & registry, std::vector<BatchType> & batches, Bat
 	}
 	for (auto & [key, slot] : index) slot.active = false;
 	size_t used = 0;
-	auto view = registry.view<const MeshRenderer, const WorldTransform>(entt::exclude<Hidden>);
+	auto view = registry.view<const MeshRenderer, const WorldTransform>(entt::exclude<Hidden, Culled>);
 	for (auto [entity, renderer, world] : view.each()) {
 		if (!renderer.visible || !renderer.mesh || renderer.mesh->getNumVertices() == 0) continue;
 		BatchKey key { renderer.mesh.get(), renderer.texture.get(), renderer.material.get(), static_cast<int>(renderer.mode) };

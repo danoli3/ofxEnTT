@@ -104,4 +104,22 @@ struct Lifetime {
 	float remaining { 1.f };
 };
 
+/// Opt-in local-space AABB, in the entity's own frame. Read by SpatialHash and
+/// CullingSystem; entities without it are never culled or indexed.
+struct LocalBounds {
+	glm::vec3 min { -0.5f };
+	glm::vec3 max { 0.5f };
+};
+
+/// Tag: the entity is outside the current camera frustum. Written by
+/// CullingSystem, excluded by the RenderSystem's batch view. Costs nothing
+/// when nobody uses CullingSystem (the tag storage stays empty).
+struct Culled {};
+
+/// Tag: this entity opts into the SpatialHash broadphase. Entities without it
+/// are not indexed. Add it next to LocalBounds for things worth querying
+/// (voxel blocks, boids, interactable props) and leave it off for everything
+/// else (floors, UI gizmos, one-shots).
+struct SpatialMember {};
+
 } // namespace ofxEnTT
